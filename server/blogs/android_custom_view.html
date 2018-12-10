@@ -1,0 +1,303 @@
+<!DOCTYPE html><html><head><title>自定义Rotate3dView</title><meta charset='utf-8'><link href='https://cdn.maxiang.io/res-min/themes/marxico.css' rel='stylesheet'><style>
+.note-content  {font-family: "Helvetica Neue", Arial, "Hiragino Sans GB", STHeiti, "Microsoft YaHei", "WenQuanYi Micro Hei", SimSun, Song, sans-serif;}
+
+</style></head><body><div id='preview-contents' class='note-content'>
+                        
+                    
+
+
+
+<h2 id="自定义rotate3dview">自定义Rotate3dView</h2>
+
+
+
+<h3 id="知识准备">知识准备</h3>
+
+<ul><li>Android自定义ViewGroup的知识。</li>
+<li>Android事件传递机制。</li>
+<li>Android Camera。</li>
+<li>Android属性动画</li>
+</ul>
+
+<p>Android Camera参考<a href="http://www.gcssloop.com/customview/matrix-3d-camera" target="_blank">GscSloop的这篇文章</a>。 <br>
+Android属性动画参考<a href="https://blog.csdn.net/guolin_blog/article/details/43536355" target="_blank">郭霖的这篇文章</a>。</p>
+
+
+
+<h3 id="初始化view">初始化View</h3>
+
+<p>准备两个View，一个正面，一个反面。然后添加到Rotate3dView里面。这里模仿了RecyclerView的Adapter，思路如下： <br>
+先定义一个抽象类，里面有一些抽象方法：</p>
+
+
+
+<pre class="prettyprint with-line-number hljs-dark"><code class="hljs scala"><div class="hljs-line"><span class="hljs-comment line-number">1.</span>public <span class="hljs-keyword">abstract</span> static <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Adapter&lt;FrontVH</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">ViewHolder</span>,<span class="hljs-title">BackVH</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">ViewHolder&gt;</span></span>{
+</div><div class="hljs-line"><span class="hljs-comment line-number">2.</span>        public <span class="hljs-keyword">abstract</span> <span class="hljs-type">FrontVH</span> onCreateFrontViewHolder(<span class="hljs-type">ViewGroup</span> parent);
+</div><div class="hljs-line"><span class="hljs-comment line-number">3.</span>        public <span class="hljs-keyword">abstract</span> void onBindFrontViewHolder(<span class="hljs-type">FrontVH</span> holder);
+</div><div class="hljs-line"><span class="hljs-comment line-number">4.</span><wbr>
+</div><div class="hljs-line"><span class="hljs-comment line-number">5.</span>        public <span class="hljs-keyword">abstract</span> <span class="hljs-type">BackVH</span> onCreateBackViewHolder(<span class="hljs-type">ViewGroup</span> parent);
+</div><div class="hljs-line"><span class="hljs-comment line-number">6.</span>        public <span class="hljs-keyword">abstract</span> void onBindBackViewHolder(<span class="hljs-type">BackVH</span> holder);
+</div><div class="hljs-line"><span class="hljs-comment line-number">7.</span><wbr>
+</div><div class="hljs-line"><span class="hljs-comment line-number">8.</span>        ......
+</div><div class="hljs-line"><span class="hljs-comment line-number">9.</span>}
+</div><div class="hljs-line"><span class="hljs-comment line-number">10.</span><wbr>
+</div><div class="hljs-line"><span class="hljs-comment line-number">11.</span>    public <span class="hljs-keyword">abstract</span> static <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">ViewHolder</span></span>{
+</div><div class="hljs-line"><span class="hljs-comment line-number">12.</span>        public <span class="hljs-type">View</span> itemView;
+</div><div class="hljs-line"><span class="hljs-comment line-number">13.</span><wbr>
+</div><div class="hljs-line"><span class="hljs-comment line-number">14.</span>        public <span class="hljs-type">ViewHolder</span>(<span class="hljs-type">View</span> itemView) {
+</div><div class="hljs-line"><span class="hljs-comment line-number">15.</span>            <span class="hljs-keyword">this</span>.itemView = itemView;
+</div><div class="hljs-line"><span class="hljs-comment line-number">16.</span>        }
+</div><div class="hljs-line"><span class="hljs-comment line-number">17.</span>    }
+</div></code></pre>
+
+<p>通过实现Adapter和它里面的这些方法，起到<strong>载入数据</strong>的作用。</p>
+
+<p>然后在setAdapter里面做功夫：</p>
+
+
+
+<pre class="prettyprint with-line-number hljs-dark"><code class="hljs mipsasm"><div class="hljs-line"><span class="hljs-comment line-number">1.</span>private void <span class="hljs-keyword">addViewFromAdapter(){</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">2.</span><span class="hljs-keyword"></span>        ViewHolder frontHolder=mAdapter.CreateFrontViewHolder(this)<span class="hljs-comment">;</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">3.</span>        mAdapter.onBindFrontViewHolder(frontHolder)<span class="hljs-comment">;</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">4.</span><wbr>
+</div><div class="hljs-line"><span class="hljs-comment line-number">5.</span>        ViewHolder <span class="hljs-keyword">backHolder=mAdapter.CreateBackViewHolder(this);</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">6.</span><span class="hljs-keyword"></span>        mAdapter.onBindBackViewHolder(<span class="hljs-keyword">backHolder);</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">7.</span><span class="hljs-keyword"></span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">8.</span>        <span class="hljs-keyword">addView(frontHolder.itemView);</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">9.</span><span class="hljs-keyword"></span>        <span class="hljs-keyword">addView(backHolder.itemView);</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">10.</span><span class="hljs-keyword"></span>    }
+</div><div class="hljs-line"><span class="hljs-comment line-number">11.</span>public void setAdapter(Adapter adapter){
+</div><div class="hljs-line"><span class="hljs-comment line-number">12.</span>        ......
+</div><div class="hljs-line"><span class="hljs-comment line-number">13.</span>        mAdapter=adapter<span class="hljs-comment">;</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">14.</span>        <span class="hljs-keyword">addViewFromAdapter();</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">15.</span><span class="hljs-keyword"></span>        requestLayout()<span class="hljs-comment">;</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">16.</span>    }    
+</div></code></pre>
+
+<p>通过AddView将绑定好数据的View添加进去，然后再调用requestLayout()，View重新测量，布局和重绘。</p>
+
+<p>接下来就是测量和布局了。 <br>
+这里测量和布局没有多考虑和研究，没有支持Margin，就默认设置前后页面都<strong>填充</strong>父布局。</p>
+
+
+
+<pre class="prettyprint with-line-number hljs-dark"><code class="hljs aspectj"><div class="hljs-line"><span class="hljs-comment line-number">1.</span><span class="hljs-meta">@Override</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">2.</span>    <span class="hljs-keyword">protected</span> <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">onLayout</span><span class="hljs-params">(<span class="hljs-keyword">boolean</span> changed, <span class="hljs-keyword">int</span> l, <span class="hljs-keyword">int</span> t, <span class="hljs-keyword">int</span> r, <span class="hljs-keyword">int</span> b)</span> </span>{
+</div><div class="hljs-line"><span class="hljs-comment line-number">3.</span>        <span class="hljs-keyword">for</span>(<span class="hljs-keyword">int</span> i=<span class="hljs-number">0</span>;i&lt;<span class="hljs-number">2</span>;i++){
+</div><div class="hljs-line"><span class="hljs-comment line-number">4.</span>            View childView=getChildAt(i);
+</div><div class="hljs-line"><span class="hljs-comment line-number">5.</span>            childView.layout(<span class="hljs-number">0</span>,<span class="hljs-number">0</span>,childView.getMeasuredWidth(),childView.getMeasuredHeight());
+</div><div class="hljs-line"><span class="hljs-comment line-number">6.</span>        }
+</div><div class="hljs-line"><span class="hljs-comment line-number">7.</span>    }
+</div></code></pre>
+
+<p><strong>重点来了：dispatchDraw</strong>。 <br>
+ViewGroup会在dispathDraw里面调用子View的onDraw，然后我们可以通过重写dispatchDraw来改变子View的Canvas。初始化的时候，frontView没有变化，backView要绕Y轴旋转180度。而且要先画backView，后画frontView。<strong>因为后画的View才会覆盖前面的View。</strong>绕Y轴旋转180度就可以用Camera来实现。</p>
+
+
+
+<pre class="prettyprint with-line-number hljs-dark"><code class="hljs mel"><div class="hljs-line"><span class="hljs-comment line-number">1.</span>private void initChildViews(Canvas <span class="hljs-keyword">canvas</span>){
+</div><div class="hljs-line"><span class="hljs-comment line-number">2.</span>        <span class="hljs-comment">//先画childView2</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">3.</span>        <span class="hljs-keyword">canvas</span>.save();
+</div><div class="hljs-line"><span class="hljs-comment line-number">4.</span>        View childView2=getChildAt(<span class="hljs-number">1</span>);
+</div><div class="hljs-line"><span class="hljs-comment line-number">5.</span>        Matrix <span class="hljs-keyword">matrix</span>=childView2.getMatrix();
+</div><div class="hljs-line"><span class="hljs-comment line-number">6.</span>        Camera <span class="hljs-keyword">camera</span>=new Camera();
+</div><div class="hljs-line"><span class="hljs-comment line-number">7.</span>        <span class="hljs-keyword">camera</span>.save();
+</div><div class="hljs-line"><span class="hljs-comment line-number">8.</span>        <span class="hljs-keyword">camera</span>.rotateY(<span class="hljs-number">180</span>);
+</div><div class="hljs-line"><span class="hljs-comment line-number">9.</span>        <span class="hljs-keyword">camera</span>.getMatrix(<span class="hljs-keyword">matrix</span>);
+</div><div class="hljs-line"><span class="hljs-comment line-number">10.</span>        <span class="hljs-keyword">camera</span>.restore();
+</div><div class="hljs-line"><span class="hljs-comment line-number">11.</span><wbr>
+</div><div class="hljs-line"><span class="hljs-comment line-number">12.</span>        <span class="hljs-keyword">matrix</span>.preTranslate(-mWidth/<span class="hljs-number">2</span>, -mHeight/<span class="hljs-number">2</span>);
+</div><div class="hljs-line"><span class="hljs-comment line-number">13.</span>        <span class="hljs-keyword">matrix</span>.postTranslate(mWidth/<span class="hljs-number">2</span>, mHeight/<span class="hljs-number">2</span>);
+</div><div class="hljs-line"><span class="hljs-comment line-number">14.</span><wbr>
+</div><div class="hljs-line"><span class="hljs-comment line-number">15.</span>        <span class="hljs-keyword">canvas</span>.concat(<span class="hljs-keyword">matrix</span>);
+</div><div class="hljs-line"><span class="hljs-comment line-number">16.</span>        drawChild(<span class="hljs-keyword">canvas</span>,childView2,getDrawingTime());
+</div><div class="hljs-line"><span class="hljs-comment line-number">17.</span>        <span class="hljs-keyword">canvas</span>.restore();
+</div><div class="hljs-line"><span class="hljs-comment line-number">18.</span><wbr>
+</div><div class="hljs-line"><span class="hljs-comment line-number">19.</span>        <span class="hljs-comment">//再画childView1</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">20.</span>        <span class="hljs-keyword">canvas</span>.save();
+</div><div class="hljs-line"><span class="hljs-comment line-number">21.</span>        View childView1=getChildAt(<span class="hljs-number">0</span>);
+</div><div class="hljs-line"><span class="hljs-comment line-number">22.</span>        drawChild(<span class="hljs-keyword">canvas</span>,childView1,getDrawingTime());
+</div><div class="hljs-line"><span class="hljs-comment line-number">23.</span>        <span class="hljs-keyword">canvas</span>.restore();
+</div><div class="hljs-line"><span class="hljs-comment line-number">24.</span>    }
+</div></code></pre>
+
+<p>这样就初始化好了Rotate3dView，并且它上面的数据已经所有装载进去。</p>
+
+
+
+<h3 id="rotate3dview的旋转动画">Rotate3dView的旋转动画</h3>
+
+<p>我们通过左滑或者右滑来旋转View，所以先要重写onInterceptTouchEvent，在里面判断是滑动还是点击。如果是滑动，就return true告诉childView这个事件我来处理。这里加入一个isRotating判断，就是告诉childView在旋转的时候你也不能点击。</p>
+
+
+
+<pre class="prettyprint with-line-number hljs-dark"><code class="hljs aspectj"><div class="hljs-line"><span class="hljs-comment line-number">1.</span><span class="hljs-meta">@Override</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">2.</span>    <span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">boolean</span> <span class="hljs-title">onInterceptTouchEvent</span><span class="hljs-params">(MotionEvent ev)</span> </span>{
+</div><div class="hljs-line"><span class="hljs-comment line-number">3.</span>        <span class="hljs-keyword">switch</span> (ev.getAction()) {
+</div><div class="hljs-line"><span class="hljs-comment line-number">4.</span>            <span class="hljs-keyword">case</span> MotionEvent.ACTION_DOWN:
+</div><div class="hljs-line"><span class="hljs-comment line-number">5.</span>                mXDown = ev.getRawX();
+</div><div class="hljs-line"><span class="hljs-comment line-number">6.</span>                <span class="hljs-keyword">break</span>;
+</div><div class="hljs-line"><span class="hljs-comment line-number">7.</span>            <span class="hljs-keyword">case</span> MotionEvent.ACTION_MOVE:
+</div><div class="hljs-line"><span class="hljs-comment line-number">8.</span>                mXMove = ev.getRawX();
+</div><div class="hljs-line"><span class="hljs-comment line-number">9.</span>                <span class="hljs-keyword">float</span> diff = Math.abs(mXMove - mXDown);
+</div><div class="hljs-line"><span class="hljs-comment line-number">10.</span>                <span class="hljs-comment">// 当手指拖动值大于TouchSlop值时，认为应该进行滚动，拦截子控件的事件</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">11.</span>                <span class="hljs-keyword">if</span> (diff &gt; mTouchSlop||isRotating) {
+</div><div class="hljs-line"><span class="hljs-comment line-number">12.</span>                    <span class="hljs-keyword">return</span> <span class="hljs-keyword">true</span>;
+</div><div class="hljs-line"><span class="hljs-comment line-number">13.</span>                }
+</div><div class="hljs-line"><span class="hljs-comment line-number">14.</span>                <span class="hljs-keyword">break</span>;
+</div><div class="hljs-line"><span class="hljs-comment line-number">15.</span>        }
+</div><div class="hljs-line"><span class="hljs-comment line-number">16.</span>        <span class="hljs-function"><span class="hljs-keyword">return</span> <span class="hljs-keyword">super</span>.<span class="hljs-title">onInterceptTouchEvent</span><span class="hljs-params">(ev)</span></span>;
+</div><div class="hljs-line"><span class="hljs-comment line-number">17.</span>    }
+</div></code></pre>
+
+<p>我告诉childView我要处理左滑或者右滑事件，那我就重写onTouchEvent来处理。</p>
+
+
+
+<pre class="prettyprint with-line-number hljs-dark"><code class="hljs aspectj"><div class="hljs-line"><span class="hljs-comment line-number">1.</span><span class="hljs-meta">@Override</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">2.</span>    <span class="hljs-keyword">public</span> <span class="hljs-function"><span class="hljs-keyword">boolean</span> <span class="hljs-title">onTouchEvent</span><span class="hljs-params">(MotionEvent event)</span> </span>{
+</div><div class="hljs-line"><span class="hljs-comment line-number">3.</span>        <span class="hljs-keyword">switch</span> (event.getAction()){
+</div><div class="hljs-line"><span class="hljs-comment line-number">4.</span>            <span class="hljs-keyword">case</span> MotionEvent.ACTION_DOWN:
+</div><div class="hljs-line"><span class="hljs-comment line-number">5.</span>                mXDown=event.getRawX();
+</div><div class="hljs-line"><span class="hljs-comment line-number">6.</span>                <span class="hljs-keyword">break</span>;
+</div><div class="hljs-line"><span class="hljs-comment line-number">7.</span>            <span class="hljs-keyword">case</span> MotionEvent.ACTION_UP:
+</div><div class="hljs-line"><span class="hljs-comment line-number">8.</span>                //Log.i(<span class="hljs-string">"ACTION_UP"</span>,<span class="hljs-string">"ACTION_UP"</span>);
+</div><div class="hljs-line"><span class="hljs-comment line-number">9.</span>                mXUp=event.getRawX();
+</div><div class="hljs-line"><span class="hljs-comment line-number">10.</span>                <span class="hljs-keyword">if</span>(Math.abs(mXUp-mXDown)&gt;mTouchSlop&amp;&amp;!isRotating) {
+</div><div class="hljs-line"><span class="hljs-comment line-number">11.</span>                    <span class="hljs-keyword">if</span> (mXUp - mXDown &gt; <span class="hljs-number">0</span>) {      <span class="hljs-comment">//从左向右滑动,逆时针旋转</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">12.</span>                        antiClockWised = <span class="hljs-keyword">true</span>;
+</div><div class="hljs-line"><span class="hljs-comment line-number">13.</span>                        startRotateAnimation();
+</div><div class="hljs-line"><span class="hljs-comment line-number">14.</span>                        Log.i(<span class="hljs-string">"ACTION_UP"</span>, <span class="hljs-string">"ACTION_UP"</span>);
+</div><div class="hljs-line"><span class="hljs-comment line-number">15.</span>                    } <span class="hljs-keyword">else</span> {
+</div><div class="hljs-line"><span class="hljs-comment line-number">16.</span>                        antiClockWised = <span class="hljs-keyword">false</span>;
+</div><div class="hljs-line"><span class="hljs-comment line-number">17.</span>                        Log.i(<span class="hljs-string">"ACTION_UP"</span>, <span class="hljs-string">"ACTION_UP"</span>);
+</div><div class="hljs-line"><span class="hljs-comment line-number">18.</span>                        startRotateAnimation();
+</div><div class="hljs-line"><span class="hljs-comment line-number">19.</span>                    }
+</div><div class="hljs-line"><span class="hljs-comment line-number">20.</span>                }
+</div><div class="hljs-line"><span class="hljs-comment line-number">21.</span>        }
+</div><div class="hljs-line"><span class="hljs-comment line-number">22.</span>        <span class="hljs-keyword">return</span> <span class="hljs-keyword">true</span>;
+</div><div class="hljs-line"><span class="hljs-comment line-number">23.</span>    }
+</div></code></pre>
+
+<p>先用mXup-mXDown来判断左滑还是右滑，左滑就顺时针旋转。然后调用startRotateAnimation()。return true可以让ACTION_DOWN到ACTION_UP一直执行。</p>
+
+
+
+<pre class="prettyprint with-line-number hljs-dark"><code class="hljs pony"><div class="hljs-line"><span class="hljs-comment line-number">1.</span>private void startRotateAnimation(){     <span class="hljs-comment">//reverse==true代表逆时针旋转</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">2.</span>        <span class="hljs-type">ValueAnimator</span> valueAnimator;
+</div><div class="hljs-line"><span class="hljs-comment line-number">3.</span>        <span class="hljs-keyword">if</span>(antiClockWised){
+</div><div class="hljs-line"><span class="hljs-comment line-number">4.</span>            valueAnimator=<span class="hljs-type">ValueAnimator</span>.ofFloat(<span class="hljs-number">0</span>,<span class="hljs-number">180</span>);
+</div><div class="hljs-line"><span class="hljs-comment line-number">5.</span>        }<span class="hljs-keyword">else</span> {
+</div><div class="hljs-line"><span class="hljs-comment line-number">6.</span>            valueAnimator=<span class="hljs-type">ValueAnimator</span>.ofFloat(<span class="hljs-number">0</span>,<span class="hljs-number">-180</span>);
+</div><div class="hljs-line"><span class="hljs-comment line-number">7.</span>        }
+</div><div class="hljs-line"><span class="hljs-comment line-number">8.</span>        valueAnimator.addUpdateListener(<span class="hljs-function"><span class="hljs-keyword">new</span> <span class="hljs-title">ValueAnimator</span>.<span class="hljs-title">AnimatorUpdateListener</span>() {</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">9.</span><span class="hljs-function">            @<span class="hljs-title">Override</span></span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">10.</span><span class="hljs-function">            <span class="hljs-title">public</span> <span class="hljs-title">void</span> <span class="hljs-title">onAnimationUpdate</span>(<span class="hljs-type">ValueAnimator</span> animation) {</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">11.</span><span class="hljs-function">                <span class="hljs-title">mAngle</span>=(float)<span class="hljs-title">animation</span>.<span class="hljs-title">getAnimatedValue</span>();</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">12.</span><span class="hljs-function">                <span class="hljs-title">invalidate</span>();</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">13.</span><span class="hljs-function">                <span class="hljs-title">if</span>(mAngle==<span class="hljs-number">180</span>||mAngle==<span class="hljs-number">-180</span>){</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">14.</span><span class="hljs-function">                    <span class="hljs-title">isRotating</span>=<span class="hljs-title">false</span>;</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">15.</span><span class="hljs-function">                    <span class="hljs-title">if</span>(frontReversed){</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">16.</span><span class="hljs-function">                        <span class="hljs-title">frontReversed</span>=<span class="hljs-title">false</span>;</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">17.</span><span class="hljs-function">                        <span class="hljs-title">getChildAt</span>(<span class="hljs-number">1</span>).<span class="hljs-title">setVisibility</span>(<span class="hljs-type">INVISIBLE</span>);</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">18.</span><span class="hljs-function">                        <span class="hljs-title">getChildAt</span>(<span class="hljs-number">0</span>).<span class="hljs-title">setVisibility</span>(<span class="hljs-type">VISIBLE</span>);</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">19.</span><span class="hljs-function">                    }<span class="hljs-title">else</span> {</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">20.</span><span class="hljs-function">                        <span class="hljs-title">frontReversed</span>=<span class="hljs-title">true</span>;</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">21.</span><span class="hljs-function">                        <span class="hljs-title">getChildAt</span>(<span class="hljs-number">0</span>).<span class="hljs-title">setVisibility</span>(<span class="hljs-type">INVISIBLE</span>);</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">22.</span><span class="hljs-function">                        <span class="hljs-title">getChildAt</span>(<span class="hljs-number">1</span>).<span class="hljs-title">setVisibility</span>(<span class="hljs-type">VISIBLE</span>);</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">23.</span><span class="hljs-function">                    }</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">24.</span><span class="hljs-function">                    <span class="hljs-title">mAngle</span>=0;</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">25.</span><span class="hljs-function">                }</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">26.</span><span class="hljs-function">            }</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">27.</span><span class="hljs-function">        });</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">28.</span><span class="hljs-function">        <span class="hljs-title">valueAnimator</span>.<span class="hljs-title">setDuration</span>(duration);</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">29.</span><span class="hljs-function">        <span class="hljs-title">valueAnimator</span>.<span class="hljs-title">start</span>();</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">30.</span><span class="hljs-function">        <span class="hljs-title">isRotating</span>=<span class="hljs-title">true</span>;</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">31.</span><span class="hljs-function">    }</span>
+</div></code></pre>
+
+<p>这里用了ValueAnimator这个属性动画，它有一个监听器onAnimationUpdate，我<strong>在里面得到在特定时刻旋转的角度</strong>，然后invalidate()重绘，把角度给dispatchDraw，如果角度是180度或者-180度，代表动画结束。 <br>
+这里设置setVisibility是为了禁止背面View和它的child的所有事件，才开始是想通过递归来禁止，后来发现了这个方法，现在还是没有出现什么问题。</p>
+
+
+
+<h3 id="开始使用">开始使用</h3>
+
+<p>一切都跟RecyclerView太相像了。</p>
+
+<p>先在res的layout里面定义item_back.xm和item_front.xml，然后写一个Adapter。</p>
+
+
+
+<pre class="prettyprint with-line-number hljs-dark"><code class="hljs scala"><div class="hljs-line"><span class="hljs-comment line-number">1.</span>public <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Rotate3dViewAdapter</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Rotate3dView</span>.<span class="hljs-title">Adapter&lt;Rotate3dViewAdapter</span>.<span class="hljs-title">FrontHolder</span>,<span class="hljs-title">Rotate3dViewAdapter</span>.<span class="hljs-title">BackHolder&gt;</span> </span>{
+</div><div class="hljs-line"><span class="hljs-comment line-number">2.</span>    <span class="hljs-type">Context</span> mContext;
+</div><div class="hljs-line"><span class="hljs-comment line-number">3.</span>    public <span class="hljs-type">Rotate3dViewAdapter</span>(<span class="hljs-type">Context</span> context) {
+</div><div class="hljs-line"><span class="hljs-comment line-number">4.</span>        mContext=context;
+</div><div class="hljs-line"><span class="hljs-comment line-number">5.</span>    }
+</div><div class="hljs-line"><span class="hljs-comment line-number">6.</span><wbr>
+</div><div class="hljs-line"><span class="hljs-comment line-number">7.</span>    public <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">FrontHolder</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Rotate3dView</span>.<span class="hljs-title">ViewHolder</span></span>{
+</div><div class="hljs-line"><span class="hljs-comment line-number">8.</span>        <span class="hljs-type">TextView</span> mTextView;
+</div><div class="hljs-line"><span class="hljs-comment line-number">9.</span>        <span class="hljs-type">Button</span> button;
+</div><div class="hljs-line"><span class="hljs-comment line-number">10.</span>        public <span class="hljs-type">FrontHolder</span>(<span class="hljs-type">View</span> itemView) {
+</div><div class="hljs-line"><span class="hljs-comment line-number">11.</span>            <span class="hljs-keyword">super</span>(itemView);
+</div><div class="hljs-line"><span class="hljs-comment line-number">12.</span>            mTextView=itemView.findViewById(<span class="hljs-type">R</span>.id.item_front_text);
+</div><div class="hljs-line"><span class="hljs-comment line-number">13.</span>            button=itemView.findViewById(<span class="hljs-type">R</span>.id.front_button);
+</div><div class="hljs-line"><span class="hljs-comment line-number">14.</span>        }
+</div><div class="hljs-line"><span class="hljs-comment line-number">15.</span>    }
+</div><div class="hljs-line"><span class="hljs-comment line-number">16.</span><wbr>
+</div><div class="hljs-line"><span class="hljs-comment line-number">17.</span>    public <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">BackHolder</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">Rotate3dView</span>.<span class="hljs-title">ViewHolder</span></span>{
+</div><div class="hljs-line"><span class="hljs-comment line-number">18.</span>        ......
+</div><div class="hljs-line"><span class="hljs-comment line-number">19.</span>    }
+</div><div class="hljs-line"><span class="hljs-comment line-number">20.</span><wbr>
+</div><div class="hljs-line"><span class="hljs-comment line-number">21.</span>    <span class="hljs-meta">@Override</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">22.</span>    public <span class="hljs-type">FrontHolder</span> onCreateFrontViewHolder(<span class="hljs-type">ViewGroup</span> parent) {
+</div><div class="hljs-line"><span class="hljs-comment line-number">23.</span>        <span class="hljs-type">View</span> v = <span class="hljs-type">LayoutInflater</span>.from(parent.getContext()).inflate(<span class="hljs-type">R</span>.layout.item_front, parent, <span class="hljs-literal">false</span>);
+</div><div class="hljs-line"><span class="hljs-comment line-number">24.</span>        <span class="hljs-type">FrontHolder</span> frontHolder=<span class="hljs-keyword">new</span> <span class="hljs-type">FrontHolder</span>(v);
+</div><div class="hljs-line"><span class="hljs-comment line-number">25.</span>        <span class="hljs-keyword">return</span> frontHolder;
+</div><div class="hljs-line"><span class="hljs-comment line-number">26.</span>    }
+</div><div class="hljs-line"><span class="hljs-comment line-number">27.</span><wbr>
+</div><div class="hljs-line"><span class="hljs-comment line-number">28.</span>    <span class="hljs-meta">@Override</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">29.</span>    public void onBindFrontViewHolder(<span class="hljs-type">FrontHolder</span> holder) {
+</div><div class="hljs-line"><span class="hljs-comment line-number">30.</span>        holder.mTextView.setText(<span class="hljs-string">"FRONT"</span>);
+</div><div class="hljs-line"><span class="hljs-comment line-number">31.</span>        holder.button.setOnClickListener(<span class="hljs-keyword">new</span> <span class="hljs-type">View</span>.<span class="hljs-type">OnClickListener</span>() {
+</div><div class="hljs-line"><span class="hljs-comment line-number">32.</span>            <span class="hljs-meta">@Override</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">33.</span>            public void onClick(<span class="hljs-type">View</span> v) {
+</div><div class="hljs-line"><span class="hljs-comment line-number">34.</span>                <span class="hljs-type">Toast</span>.makeText(mContext,<span class="hljs-string">"Front Button Clicked"</span>,<span class="hljs-type">Toast</span>.<span class="hljs-type">LENGTH_SHORT</span>).show();
+</div><div class="hljs-line"><span class="hljs-comment line-number">35.</span>            }
+</div><div class="hljs-line"><span class="hljs-comment line-number">36.</span>        });
+</div><div class="hljs-line"><span class="hljs-comment line-number">37.</span>    }
+</div><div class="hljs-line"><span class="hljs-comment line-number">38.</span><wbr>
+</div><div class="hljs-line"><span class="hljs-comment line-number">39.</span>    <span class="hljs-meta">@Override</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">40.</span>    public <span class="hljs-type">BackHolder</span> onCreateBackViewHolder(<span class="hljs-type">ViewGroup</span> parent) {
+</div><div class="hljs-line"><span class="hljs-comment line-number">41.</span>          .....
+</div><div class="hljs-line"><span class="hljs-comment line-number">42.</span>    }
+</div><div class="hljs-line"><span class="hljs-comment line-number">43.</span><wbr>
+</div><div class="hljs-line"><span class="hljs-comment line-number">44.</span>    <span class="hljs-meta">@Override</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">45.</span>    public void onBindBackViewHolder(<span class="hljs-type">BackHolder</span> holder) {
+</div><div class="hljs-line"><span class="hljs-comment line-number">46.</span>          ......
+</div><div class="hljs-line"><span class="hljs-comment line-number">47.</span>    }
+</div><div class="hljs-line"><span class="hljs-comment line-number">48.</span>}
+</div></code></pre>
+
+<p>然后在某个布局里面加入它，注意父亲布局要来个android:clipChildren=”false”，可以让Rotate3dView Overflow。</p>
+
+
+
+<pre class="prettyprint with-line-number hljs-dark"><code class="hljs stylus"><div class="hljs-line"><span class="hljs-comment line-number">1.</span>&lt;com<span class="hljs-selector-class">.benjamin</span><span class="hljs-selector-class">.mylib</span><span class="hljs-selector-class">.Rotate3dView</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">2.</span>            android:id=<span class="hljs-string">"@+id/rotate3dView"</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">3.</span>            android:layout_margin=<span class="hljs-string">"60dp"</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">4.</span>            android:layout_width=<span class="hljs-string">"match_parent"</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">5.</span>            android:layout_height=<span class="hljs-string">"match_parent"</span>&gt;
+</div><div class="hljs-line"><span class="hljs-comment line-number">6.</span>        &lt;/com<span class="hljs-selector-class">.benjamin</span><span class="hljs-selector-class">.mylib</span><span class="hljs-selector-class">.Rotate3dView</span>&gt;
+</div></code></pre>
+
+<p>然后在Activity或是Fragment里面：</p>
+
+
+
+<pre class="prettyprint with-line-number hljs-dark"><code class="hljs abnf"><div class="hljs-line"><span class="hljs-comment line-number">1.</span>Rotate3dView rotate3dView=findViewById(R.id.rotate3dView)<span class="hljs-comment">;</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">2.</span>        rotate3dView.setDuration(<span class="hljs-number">1000</span>)<span class="hljs-comment">;</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">3.</span>        Rotate3dViewAdapter adapter=new Rotate3dViewAdapter(this)<span class="hljs-comment">;</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">4.</span>        rotate3dView.setAdapter(adapter)<span class="hljs-comment">;</span>
+</div><div class="hljs-line"><span class="hljs-comment line-number">5.</span><wbr>
+</div></code></pre></div></body></html>
